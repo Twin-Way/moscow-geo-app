@@ -1,0 +1,1 @@
+export { adaptGeoJSON } from './adaptGeoJSON';

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUIStore } from '../../../entities/geo-object/model';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Box, Button, Drawer, TextField, MenuItem } from '@mui/material';
 
 export const AddObjectForm = () => {
@@ -11,35 +11,46 @@ export const AddObjectForm = () => {
 
   const qc = useQueryClient();
 
-  const mutation = useMutation({
-    mutationFn: async () => {
-      if (!tempCoords) return;
+  const mutationFn = useCallback(async () => {
+    if (!tempCoords) return;
 
-      await fetch('/api/geo', {
-        method: 'POST',
-        body: JSON.stringify({
-          type: 'Feature',
-          properties: {
-            name: name,
-            type,
-            description,
-          },
-          geometry: {
-            type: 'Point',
-            coordinates: tempCoords,
-          },
-        }),
-      });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['geo'] });
-      setAddMode(false);
-      setTempCoords(null);
-      setName('');
-      setType('custom');
-      setDescription('');
-    },
+    await fetch('/api/geo', {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'Feature',
+        properties: {
+          name: name,
+          type,
+          description,
+        },
+        geometry: {
+          type: 'Point',
+          coordinates: tempCoords,
+        },
+      }),
+    });
+  }, [tempCoords, name, type, description]);
+
+  const onSuccess = useCallback(() => {
+    qc.invalidateQueries({ queryKey: ['geo'] });
+    setAddMode(false);
+    setTempCoords(null);
+    setName('');
+    setType('custom');
+    setDescription('');
+  }, [qc, setAddMode, setTempCoords]);
+
+  const mutation = useMutation({
+    mutationFn,
+    onSuccess,
   });
+
+  const handleSave = useCallback(() => mutation.mutate(), [mutation]);
+
+  const handleCancel = useCallback(() => {
+    setAddMode(false);
+    setTempCoords(null);
+  }, [setAddMode, setTempCoords]);
 
   if (!addMode) return null;
 
@@ -93,19 +104,11 @@ export const AddObjectForm = () => {
           variant="contained"
           fullWidth
           disabled={!name || !tempCoords}
-          onClick={() => mutation.mutate()}
+          onClick={handleSave}
         >
           Сохранить
         </Button>
-        <Button
-          sx={{ mt: 2 }}
-          variant="outlined"
-          fullWidth
-          onClick={() => {
-            setAddMode(false);
-            setTempCoords(null);
-          }}
-        >
+        <Button sx={{ mt: 2 }} variant="outlined" fullWidth onClick={handleCancel}>
           Отмена
         </Button>
       </Box>

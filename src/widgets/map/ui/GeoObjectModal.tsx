@@ -1,51 +1,56 @@
+import { useMemo } from 'react';
 import { Box, Typography, Stack, Paper, Button } from '@mui/material';
 import { useUIStore } from '../../../entities/geo-object/model';
+
+const stationFields = [
+  { label: 'Название станции', key: 'name_station' },
+  { label: 'Линия', key: 'name_line' },
+  { label: 'Статус', key: 'status' },
+  { label: 'Тип', key: 'type' },
+  { label: 'Зона', key: 'area' },
+  { label: 'Адм. район', key: 'administrative_district' },
+  { label: 'Номер линии', key: 'no_line' },
+];
+
+const fieldConfig: Record<string, { label: string; key: string }[]> = {
+  bus_tram: [
+    { label: 'Название остановки', key: 'name_mpv' },
+    { label: 'Район', key: 'rayon' },
+    { label: 'Округ', key: 'ao' },
+    { label: 'Адресс остановки', key: 'address_mpv' },
+    { label: 'Маршрут', key: 'marshrut' },
+  ],
+  metro: stationFields,
+  mcd: stationFields,
+  mck: stationFields,
+  district: [
+    { label: 'Название района', key: 'NAME' },
+    { label: 'Название округа', key: 'NAME_AO' },
+  ],
+  pedestrian: [
+    { label: 'Название улицы', key: 'ST_NAME' },
+    { label: 'Тип улицы', key: 'ST_TYP_BEF' },
+  ],
+  custom: [
+    { label: 'Название', key: 'name' },
+    { label: 'Выбранный тип', key: 'selectedType' },
+    { label: 'Описание', key: 'description' },
+  ],
+};
 
 export const GeoObjectModal = () => {
   const selected = useUIStore((s) => s.selectedFeature);
 
+  const displayFields = useMemo(() => {
+    if (!selected) return [];
+    const props = selected.properties || {};
+    const type = props.type;
+    return fieldConfig[type] || [];
+  }, [selected]);
+
   if (!selected) return null;
 
   const props = selected.properties || {};
-  const type = props.type;
-
-  const stationFields = [
-    { label: 'Название станции', key: 'name_station' },
-    { label: 'Линия', key: 'name_line' },
-    { label: 'Статус', key: 'status' },
-    { label: 'Тип', key: 'type' },
-    { label: 'Зона', key: 'area' },
-    { label: 'Адм. район', key: 'administrative_district' },
-    { label: 'Номер линии', key: 'no_line' },
-  ];
-
-  const fieldConfig: Record<string, { label: string; key: string }[]> = {
-    bus_tram: [
-      { label: 'Название остановки', key: 'name_mpv' },
-      { label: 'Район', key: 'rayon' },
-      { label: 'Округ', key: 'ao' },
-      { label: 'Адресс остановки', key: 'address_mpv' },
-      { label: 'Маршрут', key: 'marshrut' },
-    ],
-    metro: stationFields,
-    mcd: stationFields,
-    mck: stationFields,
-    district: [
-      { label: 'Название района', key: 'NAME' },
-      { label: 'Название округа', key: 'NAME_AO' },
-    ],
-    pedestrian: [
-      { label: 'Название улицы', key: 'ST_NAME' },
-      { label: 'Тип улицы', key: 'ST_TYP_BEF' },
-    ],
-    custom: [
-      { label: 'Название', key: 'name' },
-      { label: 'Выбранный тип', key: 'selectedType' },
-      { label: 'Описание', key: 'description' },
-    ],
-  };
-
-  const displayFields = fieldConfig[type] || [];
 
   // Проверяем, есть ли хотя бы одно значимое поле для отображения
   const hasData = displayFields.some(({ key }) => props[key]);

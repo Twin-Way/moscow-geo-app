@@ -1,5 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { adaptGeoJSON } from '../../entities/geo-object/lib';
+import type { AdaptedGeoObject } from '../../entities/geo-object/model';
+import type { Geometry } from 'geojson';
 import metroRaw from './data/metro_station.geojson?raw';
 import busRaw from './data/bus_tram_stops.geojson?raw';
 import mcdRaw from './data/mcd_station.geojson?raw';
@@ -15,7 +17,7 @@ const streets = JSON.parse(streetsRaw);
 const district = JSON.parse(districtRaw);
 
 // Функция для загрузки кастомных точек из localStorage
-const loadCustomObjects = () => {
+const loadCustomObjects = (): AdaptedGeoObject[] => {
   try {
     const stored = localStorage.getItem('customGeoObjects');
     return stored ? JSON.parse(stored) : [];
@@ -26,7 +28,7 @@ const loadCustomObjects = () => {
 };
 
 // Функция для сохранения кастомных точек в localStorage
-const saveCustomObjects = (customObjects: any[]) => {
+const saveCustomObjects = (customObjects: AdaptedGeoObject[]) => {
   try {
     localStorage.setItem('customGeoObjects', JSON.stringify(customObjects));
   } catch (e) {
@@ -51,16 +53,16 @@ export const handlers = [
 
   http.post('/api/geo', async ({ request }) => {
     const featureData = (await request.json()) as {
-      properties?: Record<string, any>;
-      geometry?: any;
+      properties?: Record<string, unknown>;
+      geometry?: Geometry;
     };
     const selectedType = featureData.properties?.type;
-    const newObj = {
+    const newObj: AdaptedGeoObject = {
       id: crypto.randomUUID(),
       type: 'custom',
-      name: featureData.properties?.name || 'Без названия',
-      description: featureData.properties?.description || '',
-      geometry: featureData.geometry,
+      name: String(featureData.properties?.name || 'Без названия'),
+      description: String(featureData.properties?.description || ''),
+      geometry: featureData.geometry!,
       meta: {
         selectedType,
         ...featureData.properties,

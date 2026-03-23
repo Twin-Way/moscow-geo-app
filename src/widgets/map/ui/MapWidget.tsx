@@ -1,3 +1,4 @@
+import { useMemo, useCallback } from 'react';
 import { useGeoObjects } from '../../../entities/geo-object/api';
 import { useUIStore } from '../../../entities/geo-object/model';
 import DeckGL from '@deck.gl/react';
@@ -7,8 +8,9 @@ import { BitmapLayer } from '@deck.gl/layers';
 import { GeoObjectModal } from './GeoObjectModal';
 import { AddObjectForm } from '../../add-object-form';
 import { Button } from '@mui/material';
+import type { Feature } from 'geojson';
 
-function getColorByType(type: string) {
+function getColorByType(type: string): [number, number, number] {
   switch (type) {
     case 'custom':
       return [150, 150, 150];
@@ -35,95 +37,139 @@ export const MapWidget = () => {
   const { select, addMode, tempCoords, setTempCoords, setAddMode } = useUIStore();
   const isAdding = addMode;
 
-  const osmLayer = new TileLayer({
-    id: 'osm',
-    data: 'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    minZoom: 0,
-    maxZoom: 19,
-    tileSize: 256,
-    renderSubLayers: (props) => {
-      const tile = props.tile as any;
-      const { west, south, east, north } = tile.bbox;
+  const osmLayer = useMemo(
+    () =>
+      new TileLayer({
+        id: 'osm',
+        data: 'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        minZoom: 0,
+        maxZoom: 19,
+        tileSize: 256,
+        renderSubLayers: (props) => {
+          const bbox = props.tile.bbox as any;
+          const { west, south, east, north } = bbox;
 
-      return new BitmapLayer(props, {
-        data: undefined,
-        image: props.data,
-        bounds: [west, south, east, north],
-      });
-    },
-  });
-
-  const districtLayer = new GeoJsonLayer({
-    id: 'districts',
-    data: features.filter((f) => f.properties?.type === 'district'),
-    filled: true,
-    stroked: true,
-    getFillColor: ((d: any) => getColorByType(d.properties?.type as string)) as any,
-    getLineColor: [0, 0, 0],
-    pickable: true,
-    onClick: (info) => {
-      if (info.object) {
-        select(info.object);
-      }
-    },
-  });
-
-  const pedestrianLayer = new GeoJsonLayer({
-    id: 'pedestrian',
-    data: features.filter((f) => f.properties?.type === 'pedestrian'),
-    stroked: true,
-    filled: false,
-    getLineColor: ((d: any) => getColorByType(d.properties?.type as string)) as any,
-    getLineWidth: 2,
-    pickable: true,
-    onClick: (info) => {
-      if (info.object) {
-        select(info.object);
-      }
-    },
-  });
-
-  const pointsLayer = new GeoJsonLayer({
-    id: 'points',
-    data: features.filter(
-      (f) => f.properties?.type !== 'district' && f.properties?.type !== 'pedestrian'
-    ),
-    pointRadiusMinPixels: 4,
-    pointRadiusMaxPixels: 8,
-    getFillColor: ((d: any) => getColorByType(d.properties?.type as string)) as any,
-    pickable: !isAdding,
-    onClick: (info) => {
-      if (info.object) {
-        select(info.object);
-      }
-    },
-  });
-
-  const prewiewLayer = tempCoords
-    ? new GeoJsonLayer({
-        id: 'preview',
-        data: {
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: tempCoords,
-          },
-          properties: {
-            type: 'preview',
-          },
+          return new BitmapLayer(props, {
+            data: undefined,
+            image: props.data,
+            bounds: [west, south, east, north],
+          });
         },
+      }),
+    []
+  );
+
+  const districtLayer = useMemo(
+    () =>
+      new GeoJsonLayer({
+        id: 'districts',
+        data: features.filter((f) => f.properties?.type === 'district'),
+        filled: true,
+        stroked: true,
+        getFillColor: (d: Feature) => getColorByType(d.properties?.type as string),
+        getLineColor: [0, 0, 0],
+        pickable: true,
+        onClick: (info) => {
+          if (info.object) {
+            select(info.object);
+          }
+        },
+      }),
+    [features, select]
+  );
+
+  const pedestrianLayer = useMemo(
+    () =>
+      new GeoJsonLayer({
+        id: 'pedestrian',
+        data: features.filter((f) => f.properties?.type === 'pedestrian'),
+        stroked: true,
+        filled: false,
+        getLineColor: (d: Feature) => getColorByType(d.properties?.type as string),
+        getLineWidth: 2,
+        pickable: true,
+        onClick: (info) => {
+          if (info.object) {
+            select(info.object);
+          }
+        },
+      }),
+    [features, select]
+  );
+
+  const pointsLayer = useMemo(
+    () =>
+      new GeoJsonLayer({
+        id: 'points',
+        data: features.filter(
+          (f) => f.properties?.type !== 'district' && f.properties?.type !== 'pedestrian'
+        ),
         pointRadiusMinPixels: 4,
         pointRadiusMaxPixels: 8,
-        getFillColor: [0, 0, 0],
-        pickable: false,
-      })
-    : null;
+        getFillColor: (d: Feature) => getColorByType(d.properties?.type as string),
+        pickable: !isAdding,
+        onClick: (info) => {
+          if (info.object) {
+            select(info.object);
+          }
+        },
+      }),
+    [features, isAdding, select]
+  );
+
+  const prewiewLayer = useMemo(
+    () =>
+      tempCoords
+        ? new GeoJsonLayer({
+            id: 'preview',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'Point',
+                coordinates: tempCoords,
+              },
+              properties: {
+                type: 'preview',
+              },
+            },
+            pointRadiusMinPixels: 4,
+            pointRadiusMaxPixels: 8,
+            getFillColor: [0, 0, 0],
+            pickable: false,
+          })
+        : null,
+    [tempCoords]
+  );
+
+  const layers = useMemo(
+    () => [osmLayer, districtLayer, pedestrianLayer, prewiewLayer, pointsLayer].filter(Boolean),
+    [osmLayer, districtLayer, pedestrianLayer, prewiewLayer, pointsLayer]
+  );
+
+  const handleDeckClick = useCallback(
+    (info: any) => {
+      if (addMode) {
+        if (info.coordinate) {
+          setTempCoords(info.coordinate as [number, number]);
+        }
+        return;
+      }
+      if (info.object) {
+        select(info.object);
+      }
+    },
+    [addMode, setTempCoords, select]
+  );
+
+  const getCursor = useCallback(() => (addMode ? 'crosshair' : 'grab'), [addMode]);
+
+  const handleAddButtonClick = useCallback(() => setAddMode(true), [setAddMode]);
 
   return (
     <>
       <Button
         variant={addMode ? 'outlined' : 'contained'}
-        onClick={() => setAddMode(true)}
+        onClick={handleAddButtonClick}
         sx={{ position: 'fixed', top: 20, left: 20, zIndex: 1000 }}
       >
         Добавить точку
@@ -135,21 +181,9 @@ export const MapWidget = () => {
           zoom: 10,
         }}
         controller
-        layers={[osmLayer, districtLayer, pedestrianLayer, prewiewLayer, pointsLayer].filter(
-          Boolean
-        )}
-        onClick={(info) => {
-          if (addMode) {
-            if (info.coordinate) {
-              setTempCoords(info.coordinate as [number, number]);
-            }
-            return;
-          }
-          if (info.object) {
-            select(info.object);
-          }
-        }}
-        getCursor={() => (addMode ? 'crosshair' : 'grab')}
+        layers={layers}
+        onClick={handleDeckClick}
+        getCursor={getCursor}
       />
       <GeoObjectModal />
       <AddObjectForm />
